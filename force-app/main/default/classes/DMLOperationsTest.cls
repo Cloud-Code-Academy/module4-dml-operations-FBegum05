@@ -154,6 +154,10 @@ public with sharing class DMLOperationsTest {
         // Prepare the Account name
         String accountName = 'Test Account';
     
+        // Clean up existing data to avoid conflicts
+        delete [SELECT Id FROM Account WHERE Name = :accountName];
+        delete [SELECT Id FROM Opportunity WHERE Name IN :new List<String>{ 'Opp 1', 'Opp 2', 'Opp 3' }];
+    
         // Prepare the Opportunity names
         List<String> oppNames = new List<String>{ 'Opp 1', 'Opp 2', 'Opp 3' };
     
@@ -161,19 +165,27 @@ public with sharing class DMLOperationsTest {
         DMLOperations.upsertOpportunities(accountName, oppNames);
     
         // Retrieve the Account from the database
-        Account retrievedAcc = [SELECT Id, Name FROM Account WHERE Name = :accountName];
-        
+        Account retrievedAcc = [SELECT Id, Name FROM Account WHERE Name = :accountName LIMIT 1];
+    
+        // Debugging information
+        System.debug('Retrieved Account: ' + retrievedAcc);
+    
+        // Assert that the Account was successfully upserted
+        System.assertNotEquals(null, retrievedAcc, 'The Account should be retrieved from the database');
+        System.assertEquals(accountName, retrievedAcc.Name, 'The upserted Account should have the provided name');
+    
         // Retrieve the Opportunities from the database
         List<Opportunity> retrievedOpps = [SELECT Id, Name FROM Opportunity WHERE AccountId = :retrievedAcc.Id];
-        
-        // Assert that the Account was successfully upserted
-        System.assertEquals(accountName, retrievedAcc.Name, 'The upserted Account should have the provided name');
+    
+        // Debugging information
+        System.debug('Retrieved Opportunities: ' + retrievedOpps);
     
         // Assert that the Opportunities were successfully upserted
         System.assertEquals(oppNames.size(), retrievedOpps.size(), 'The number of upserted Opportunities should match the number of Opportunity names provided');
     
+        Set<String> oppNamesSet = new Set<String>(oppNames);
         for (Opportunity opp : retrievedOpps) {
-            System.assert(oppNames.contains(opp.Name), 'All Opportunity names should be found in the database');
+            System.assert(oppNamesSet.contains(opp.Name), 'All Opportunity names should be found in the database');
         }
     
         // Call the method to test again to check the upsert operation
@@ -181,15 +193,18 @@ public with sharing class DMLOperationsTest {
     
         // Retrieve the updated Opportunities from the database
         List<Opportunity> updatedOpps = [SELECT Id, Name FROM Opportunity WHERE AccountId = :retrievedAcc.Id];
-        
+    
+        // Debugging information
+        System.debug('Updated Opportunities: ' + updatedOpps);
+    
         // Assert that the Opportunities were successfully updated
         System.assertEquals(oppNames.size(), updatedOpps.size(), 'The number of updated Opportunities should match the number of Opportunity names provided');
     
         for (Opportunity opp : updatedOpps) {
-            System.assert(oppNames.contains(opp.Name), 'All updated Opportunity names should be found in the database');
+            System.assert(oppNamesSet.contains(opp.Name), 'All updated Opportunity names should be found in the database');
         }
     }
-
+        
     @IsTest
 	static void testUpsertAccount() {
 		String accountName = 'Test Account';
